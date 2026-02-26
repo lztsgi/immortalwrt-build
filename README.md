@@ -15,8 +15,6 @@ luci-app-samba4：存储共享
 * **网络预设**：
     * [cite_start]**默认后台 IP**：`192.168.101.2` [cite: 2]
     * [cite_start]**默认网关**：`192.168.101.1` [cite: 2]
-* **内置软件源**：镜像中已预先注入了 `momo` 与 `nikki` 的第三方 APK 软件源配置及安全密钥。
-    * *使用方法：刷机后确保 N1 联网，直接运行 `apk add luci-app-nikki` 等命令即可按需快速安装，无需再手动添加源。*
 
 ---
 
@@ -31,7 +29,7 @@ luci-app-samba4：存储共享
 
 #### 1. 插件增减控制
 修改文件：`armsr/armv8/N1/.config`
-* 若要禁用特定插件：找到对应项将 `=y` 改为 `=n`：`CONFIG_PACKAGE_luci-app-passwall=n` `CONFIG_PACKAGE_luci-app-podman=n``CONFIG_PACKAGE_luci-app-samba4=n`
+* 若要禁用特定插件：找到对应项将 `=y` 改为 `=n`：`CONFIG_PACKAGE_luci-app-passwall=n` `CONFIG_PACKAGE_luci-app-podman=n` `CONFIG_PACKAGE_luci-app-samba4=n`
 * 本固件已默认精简：`passwall`、`podman`、`samba4`。
 
 #### 2. 源码拉取逻辑
