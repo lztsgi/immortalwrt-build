@@ -111,21 +111,21 @@ jobs:
         body: |
           首次使用建议全新刷写
           * 基本信息
-          路径：armsr/armv8/N1/files/etc/config/network
-            IP: 192.168.101.2
+            IP路径修改：armsr/armv8/N1/files/etc/config/network
+              IP: 192.168.101.2
             账户: root
-            密码: root
+            密码: password
           * 调整
-          修改预装插件：armsr/armv8/N1/.config
-            CONFIG_PACKAGE_luci-app-passwall=n
-            CONFIG_PACKAGE_luci-app-podman=n
-            CONFIG_PACKAGE_luci-app-samba4=n
-          修改预备脚本：armsr/armv8/diy/diy.sh
-            git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 clone/passwall
-            git clone https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman --depth=1 feeds/luci/applications/luci-app-podman
-          添加预置momo：nikki源：armsr/armv8/N1/mk_s905d_n1.sh
-            chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-momo/raw/refs/heads/main/feed.sh | ash"
-            chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-nikki/raw/refs/heads/main/feed.sh | ash"          
+            修改预装插件：armsr/armv8/N1/.config
+              CONFIG_PACKAGE_luci-app-passwall=n
+              CONFIG_PACKAGE_luci-app-podman=n
+              CONFIG_PACKAGE_luci-app-samba4=n
+            修改预备脚本：armsr/armv8/diy/diy.sh
+              git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 clone/passwall
+              git clone https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman --depth=1 feeds/luci/applications/luci-app-podman
+            添加预置momo：nikki源：armsr/armv8/N1/mk_s905d_n1.sh
+              chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-momo/raw/refs/heads/main/feed.sh | ash"
+              chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-nikki/raw/refs/heads/main/feed.sh | ash"          
 
     - name: Delete old releases
       uses: dev-drprasad/delete-older-releases@master
