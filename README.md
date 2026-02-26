@@ -5,19 +5,7 @@
 [luci-app-passwall](https://github.com/Openwrt-Passwall/openwrt-passwall)：科学上网<br>
 [luci-app-podman](https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman)：容器管理<br>
 luci-app-samba4：存储共享
-如果不要修改下面设置：
-  修改预装插件：armsr/armv8/N1/.config
 
-  修改预备脚本：armsr/armv8/diy/diy.sh
-    git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 clone/passwall
-    git clone https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman --depth=1 feeds/luci/applications/luci-app-podman
-    修改：cp -rf clone/amlogic/luci-app-amlogic clone/passwall/luci-app-passwall feeds/luci/applications/改为下面
-    cp -rf clone/amlogic/luci-app-amlogic feeds/luci/applications/
-
-### 📌 项目简介
-本固件专为 **斐讯 N1** 旁路由模式适配，追求极简、稳定与高效。
-* **核心理念**：彻底移除 PPPoE、WiFi 等旁路由环境下冗余的功能，最大化系统资源利用率。
-* **技术底座**：基于 [ImmortalWrt-25.12](https://github.com/immortalwrt/immortalwrt/tree/openwrt-25.12) 源码编译，集成原生 `apk` 包管理器支持。
 
 ---
 
@@ -43,15 +31,15 @@ luci-app-samba4：存储共享
 
 #### 1. 插件增减控制
 修改文件：`armsr/armv8/N1/.config`
-* 若要禁用特定插件：找到对应项将 `=y` 改为 `=n`。
+* 若要禁用特定插件：找到对应项将 `=y` 改为 `=n`：`CONFIG_PACKAGE_luci-app-passwall=n` `CONFIG_PACKAGE_luci-app-podman=n``CONFIG_PACKAGE_luci-app-samba4=n`
 * 本固件已默认精简：`passwall`、`podman`、`samba4`。
-  `CONFIG_PACKAGE_luci-app-passwall=n`
-  `CONFIG_PACKAGE_luci-app-podman=n`
-  `CONFIG_PACKAGE_luci-app-samba4=n`
 
 #### 2. 源码拉取逻辑
 修改文件：`armsr/armv8/diy/diy.sh`
 * 本版本已优化：仅保留 `amlogic` 源码克隆逻辑，修复了因路径不存在导致的编译中断问题。
+* 删除：`git clone https://github.com/Openwrt-Passwall/openwrt-passwall --depth=1 clone/passwall`
+* 删除：`git clone https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman --depth=1 feeds/luci/applications/luci-app-podman`
+* 修改：`cp -rf clone/amlogic/luci-app-amlogic clone/passwall/luci-app-passwall feeds/luci/applications/`改为`cp -rf clone/amlogic/luci-app-amlogic feeds/luci/applications/`
 
 #### 3. 分区容量调整
 修改文件：`armsr/armv8/N1/mk_s905d_n1.sh`
