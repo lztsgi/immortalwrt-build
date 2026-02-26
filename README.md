@@ -39,10 +39,6 @@ luci-app-samba4：存储共享
 * 删除：`git clone https://github.com/Zerogiven-OpenWRT-Packages/luci-app-podman --depth=1 feeds/luci/applications/luci-app-podman`
 * 修改：`cp -rf clone/amlogic/luci-app-amlogic clone/passwall/luci-app-passwall feeds/luci/applications/`改为`cp -rf clone/amlogic/luci-app-amlogic feeds/luci/applications/`
 
-#### 3. 分区容量调整
-修改文件：`armsr/armv8/N1/mk_s905d_n1.sh`
-* 通过修改 `ROOTFS_MB=1024` 变量来控制生成的 `.img` 镜像体积。
-
 ***
 # 致谢
 本项目基于 [ImmortalWrt-25.12](https://github.com/immortalwrt/immortalwrt/tree/openwrt-25.12) 源码编译，使用 flippy 的[脚本](https://github.com/unifreq/openwrt_packit)和 breakingbadboy 维护的[内核](https://github.com/breakingbadboy/OpenWrt/releases/tag/kernel_stable)打包成完整固件，感谢开发者们的无私分享。<br>
