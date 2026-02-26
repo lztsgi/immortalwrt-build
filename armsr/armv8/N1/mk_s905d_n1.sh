@@ -165,6 +165,8 @@ echo
 
 echo "修改根文件系统相关配置 ... "
 cd $TGT_ROOT
+chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-momo/raw/refs/heads/main/feed.sh | ash"
+chroot . ash -c "wget -O - https://github.com/nikkinikki-org/OpenWrt-nikki/raw/refs/heads/main/feed.sh | ash"
 copy_supplement_files
 extract_glibc_programs
 adjust_docker_config
