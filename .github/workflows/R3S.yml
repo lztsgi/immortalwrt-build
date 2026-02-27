@@ -65,9 +65,9 @@ jobs:
         ENABLE_PPPOE=0
         PPPOE_USER="<PLACEHOLDER_USER>"
         PPPOE_PASS="<PLACEHOLDER_PASS>"
-        LAN_IP="192.168.100.1"
+        LAN_IP="192.168.100.2"
         LAN_NETMASK="255.255.255.0"
-        ENABLE_DHCP_SERVER=1
+        ENABLE_DHCP_SERVER=0
 
         # ================= 💾 扩容分区配置区 =================
         NEW_PART_SIZE="+2G"
