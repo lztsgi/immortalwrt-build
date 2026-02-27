@@ -18,6 +18,11 @@ env:
 jobs:
   build_r3s:
     runs-on: ubuntu-24.04
+    # 授权 GITHUB_TOKEN 拥有操作 Release 和 缓存清理 的写入权限
+    permissions:
+      actions: write
+      contents: write
+
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -38,7 +43,8 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update > /dev/null
-        sudo -E apt-get -qq install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget xz-utils > /dev/null
+        # 已修复 gawk 并补充 python3-pyelftools
+        sudo -E apt-get -qq install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools python3-pyelftools rsync swig unzip zlib1g-dev file wget xz-utils > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
         sudo timedatectl set-timezone "$TZ"
@@ -48,6 +54,14 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH --single-branch --depth=1 openwrt
         echo "FILE_DATE=$(date +"%Y%m%d")" >> $GITHUB_ENV
 
+    - name: Restore Download Cache
+      uses: actions/cache/restore@v4
+      with:
+        path: openwrt/dl
+        key: openwrt-dl-${{ github.run_id }}
+        restore-keys: |
+          openwrt-dl-
+
     - name: Update & Install feeds
       working-directory: ./openwrt
       run: |
@@ -56,18 +70,10 @@ jobs:
 
     - name: Load Config & Inject Initialization Script
       run: |
-        # 1. 拷贝您的基础 .config
         cp armsr/armv8/R3S/.config openwrt/.config
-        
-        # 2. [核心] 动态追加编译时扩容参数
         echo "CONFIG_TARGET_ROOTFS_PARTSIZE=${{ github.event.inputs.rootfs_size }}" >> openwrt/.config
-        # 确保生成 EXT4 格式以便利用大空间
         echo "CONFIG_TARGET_ROOTFS_EXT4FS=y" >> openwrt/.config
-        
-        # 3. 创建开机自启目录
         mkdir -p openwrt/files/etc/uci-defaults
-        
-        # 4. 拷贝您的网络判断脚本，并重命名为 99-network-init
         cp armsr/armv8/R3S/initialization.sh openwrt/files/etc/uci-defaults/99-network-init
         chmod +x openwrt/files/etc/uci-defaults/99-network-init
 
@@ -78,6 +84,14 @@ jobs:
         make download -j8
         find dl -size -1k -exec rm -f {} \;
 
+    - name: Save Download Cache
+      # 即使后面的编译(Compile)失败，这一步也会将下载好的包存入缓存
+      uses: actions/cache/save@v4
+      if: always()
+      with:
+        path: openwrt/dl
+        key: openwrt-dl-${{ github.run_id }}
+
     - name: Compile R3S firmware
       working-directory: ./openwrt
       run: |
@@ -87,9 +101,7 @@ jobs:
       working-directory: ./openwrt
       run: |
         cd bin/targets/rockchip/armv8/
-        # 解压官方生成的 .gz
         gunzip *sysupgrade.img.gz || true
-        # 使用最高压缩率多线程重新压缩为 .xz
         xz -z9 -T0 *sysupgrade.img || true
 
     - name: Upload R3S firmware
@@ -101,5 +113,12 @@ jobs:
           NanoPi R3S 官方 ImmortalWrt 固件
           * 架构：Rockchip RK356X
           * 根分区大小：${{ github.event.inputs.rootfs_size }} MB
-          * 镜像格式：.img.xz
           * 包含智能网卡探测与初始化配置。
+
+    - name: Cleanup Cache on Success
+      # 仅在整个工作流成功完成（编译+发布无报错）时触发缓存销毁
+      if: success()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh cache delete --all || true
