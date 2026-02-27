@@ -1,0 +1,210 @@
+name: Build ImmortalWrt for R3S
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 1,16 * *"
+
+env:
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: openwrt-24.10
+  TZ: Asia/Shanghai
+
+jobs:
+  build_r3s:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+      
+    - name: Free up space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
+    - name: Initialize environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt-get -qq update > /dev/null
+        sudo -E apt-get -qq install -y build-essential clang flex bison g++ awk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget > /dev/null
+        sudo -E apt-get -qq autoremove --purge > /dev/null
+        sudo -E apt-get -qq clean > /dev/null
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: Clone source code
+      run: |
+        git clone $REPO_URL -b $REPO_BRANCH --single-branch --depth=1 openwrt
+        echo "FILE_DATE=$(date +"%Y%m%d")" >> $GITHUB_ENV
+
+    - name: Update & Install feeds
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Load Config & Inject First-Run Script
+      run: |
+        # 1. 复制我们刚才创建的配置文件
+        cp r3s.config openwrt/.config
+        
+        # 2. 创建 files 目录结构
+        mkdir -p openwrt/files/etc/uci-defaults
+        
+        # 3. 动态注入您需要的初始化与扩容脚本 (带防死循环安全修复)
+        cat << 'EOF' > openwrt/files/etc/uci-defaults/99-r3s-init
+        #!/bin/sh
+        # ================= 🔧 基础网络配置区 =================
+        WAN_IFACE=""
+        ENABLE_PPPOE=0
+        PPPOE_USER="<PLACEHOLDER_USER>"
+        PPPOE_PASS="<PLACEHOLDER_PASS>"
+        LAN_IP="192.168.100.1"
+        LAN_NETMASK="255.255.255.0"
+        ENABLE_DHCP_SERVER=1
+
+        # ================= 💾 扩容分区配置区 =================
+        NEW_PART_SIZE="+2G"
+        TARGET_DISK="/dev/mmcblk0"
+        TARGET_PART="${TARGET_DISK}p3"
+
+        # --- 1. 网络初始化逻辑 ---
+        uci set firewall.@zone[1].input='ACCEPT'
+        uci commit firewall
+
+        interfaces=$(ls /sys/class/net | grep -E '^(eth|en)' | sort)
+        valid_ifaces=""
+        count=0
+        for iface in $interfaces; do
+            if [ -e "/sys/class/net/$iface/device" ]; then
+                count=$((count + 1))
+                valid_ifaces="$valid_ifaces $iface"
+            fi
+        done
+        valid_ifaces=$(echo "$valid_ifaces" | sed 's/^ //')
+
+        if [ "$count" -eq 1 ]; then
+            uci delete network.wan 2>/dev/null
+            uci delete network.wan6 2>/dev/null
+            uci set network.lan.proto='dhcp'
+            uci set dhcp.lan.ignore='1'
+        elif [ "$count" -gt 1 ]; then
+            uci set network.lan.proto='static'
+            uci set network.lan.ipaddr="$LAN_IP"
+            uci set network.lan.netmask="$LAN_NETMASK"
+            
+            if [ -n "$WAN_IFACE" ]; then
+                wan_iface="$WAN_IFACE"
+            else
+                wan_iface=$(echo "$valid_ifaces" | awk '{print $1}')
+            fi
+            
+            uci delete network.wan6 2>/dev/null
+            uci set network.wan=interface
+            uci set network.wan.device="$wan_iface"
+            
+            if [ "$ENABLE_PPPOE" -eq 1 ]; then
+                uci set network.wan.proto='pppoe'
+                uci set network.wan.username="$PPPOE_USER"
+                uci set network.wan.password="$PPPOE_PASS"
+                uci set network.wan.peerdns='1'
+                uci set network.wan.defaultroute='1'
+            else
+                uci set network.wan.proto='dhcp'
+            fi
+            
+            lan_ifaces=""
+            for iface in $valid_ifaces; do
+                if [ "$iface" != "$wan_iface" ]; then
+                    lan_ifaces="$lan_ifaces $iface"
+                fi
+            done
+            lan_ifaces=$(echo "$lan_ifaces" | sed 's/^ //')
+            
+            uci delete network.lan.ifname 2>/dev/null
+            for iface in $lan_ifaces; do
+                uci add_list network.lan.ifname="$iface"
+            done
+            
+            if [ "$ENABLE_DHCP_SERVER" -eq 1 ]; then
+                uci set dhcp.lan.ignore='0'
+            else
+                uci set dhcp.lan.ignore='1'
+            fi
+        fi
+        uci commit network
+        uci commit dhcp
+
+        # --- 2. 自动扩容 Overlay 逻辑 (修复版) ---
+        echo ">> 开始执行分区扩容流程..."
+
+        if [ -e "$TARGET_PART" ]; then
+            echo "⚠️ 警告：$TARGET_PART 已存在，结束初始化流程。"
+            rm -f /etc/uci-defaults/99-r3s-init
+            exit 0
+        fi
+
+        printf "n\np\n3\n\n${NEW_PART_SIZE}\nw\n" | fdisk "$TARGET_DISK"
+        partprobe "$TARGET_DISK" 2>/dev/null || true
+        sleep 2
+
+        if [ ! -e "$TARGET_PART" ]; then
+            rm -f /etc/uci-defaults/99-r3s-init
+            exit 1
+        fi
+
+        mkfs.ext4 -F "$TARGET_PART"
+        mkdir -p /tmp/new_overlay
+        mount "$TARGET_PART" /tmp/new_overlay
+        cp -a -f /overlay/. /tmp/new_overlay/
+        sync
+
+        UUID=$(block info "$TARGET_PART" | grep -o -e 'UUID="[^"]*"' | cut -d'"' -f2)
+
+        uci -q delete fstab.overlay
+        uci commit fstab
+
+        uci -q batch << EOU
+        add fstab mount
+        set fstab.@mount[-1].target='/overlay'
+        set fstab.@mount[-1].uuid='$UUID'
+        set fstab.@mount[-1].fstype='ext4'
+        set fstab.@mount[-1].enabled='1'
+        commit fstab
+        EOU
+
+        umount /tmp/new_overlay
+        rm -f /etc/uci-defaults/99-r3s-init
+        ( sleep 3 ; reboot ) &
+        exit 0
+        EOF
+        
+        # 赋予脚本执行权限
+        chmod +x openwrt/files/etc/uci-defaults/99-r3s-init
+
+    - name: Download package
+      working-directory: ./openwrt
+      run: |
+        make defconfig
+        make download -j8
+        find dl -size -1k -exec rm -f {} \;
+
+    - name: Compile R3S firmware
+      working-directory: ./openwrt
+      run: |
+        make -j$(nproc) || make -j1 V=s
+
+    - name: Upload R3S firmware
+      uses: softprops/action-gh-release@master
+      with:
+        tag_name: R3S_ImmortalWrt_${{ env.FILE_DATE }}
+        files: openwrt/bin/targets/rockchip/armv8/*sysupgrade.img.gz
+        body: |
+          NanoPi R3S 纯净官方 ImmortalWrt 固件
+          内置：PPPoE 拨号、Dockers 环境依赖、NAS/网盘挂载内核模块、首次开机自动配置扩容脚本。
