@@ -2,6 +2,11 @@ name: Build ImmortalWrt for R3S
 
 on:
   workflow_dispatch:
+    inputs:
+      rootfs_size:
+        description: '设定 Rootfs 根分区大小 (单位: MB，2G = 2048)'
+        required: true
+        default: '2048'
   schedule:
     - cron: "0 0 1,16 * *"
 
@@ -33,7 +38,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update > /dev/null
-        sudo -E apt-get -qq install -y build-essential clang flex bison g++ awk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget > /dev/null
+        sudo -E apt-get -qq install -y build-essential clang flex bison g++ awk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget xz-utils > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
         sudo timedatectl set-timezone "$TZ"
@@ -51,17 +56,20 @@ jobs:
 
     - name: Load Config & Inject Initialization Script
       run: |
-        # 1. 加载您存放在 R3S 文件夹的 .config
+        # 1. 拷贝您的基础 .config
         cp armsr/armv8/R3S/.config openwrt/.config
         
-        # 2. 创建 files 目录结构 (用于挂载开机自启脚本)
+        # 2. [核心] 动态追加编译时扩容参数
+        echo "CONFIG_TARGET_ROOTFS_PARTSIZE=${{ github.event.inputs.rootfs_size }}" >> openwrt/.config
+        # 确保生成 EXT4 格式以便利用大空间
+        echo "CONFIG_TARGET_ROOTFS_EXT4FS=y" >> openwrt/.config
+        
+        # 3. 创建开机自启目录
         mkdir -p openwrt/files/etc/uci-defaults
         
-        # 3. 将您的 initialization.sh 复制过去，并重命名为 99-r3s-init 以确保开机自动执行
-        cp armsr/armv8/R3S/initialization.sh openwrt/files/etc/uci-defaults/99-r3s-init
-        
-        # 4. 赋予脚本执行权限
-        chmod +x openwrt/files/etc/uci-defaults/99-r3s-init
+        # 4. 拷贝您的网络判断脚本，并重命名为 99-network-init
+        cp armsr/armv8/R3S/initialization.sh openwrt/files/etc/uci-defaults/99-network-init
+        chmod +x openwrt/files/etc/uci-defaults/99-network-init
 
     - name: Download package
       working-directory: ./openwrt
@@ -75,10 +83,23 @@ jobs:
       run: |
         make -j$(nproc) || make -j1 V=s
 
+    - name: Re-compress Image to XZ
+      working-directory: ./openwrt
+      run: |
+        cd bin/targets/rockchip/armv8/
+        # 解压官方生成的 .gz
+        gunzip *sysupgrade.img.gz || true
+        # 使用最高压缩率多线程重新压缩为 .xz
+        xz -z9 -T0 *sysupgrade.img || true
+
     - name: Upload R3S firmware
       uses: softprops/action-gh-release@master
       with:
         tag_name: R3S_ImmortalWrt_${{ env.FILE_DATE }}
-        files: openwrt/bin/targets/rockchip/armv8/*sysupgrade.img.gz
+        files: openwrt/bin/targets/rockchip/armv8/*sysupgrade.img.xz
         body: |
-          NanoPi R3S
+          NanoPi R3S 官方 ImmortalWrt 固件
+          * 架构：Rockchip RK356X
+          * 根分区大小：${{ github.event.inputs.rootfs_size }} MB
+          * 镜像格式：.img.xz
+          * 包含智能网卡探测与初始化配置。
