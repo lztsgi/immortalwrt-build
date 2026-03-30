@@ -2,7 +2,7 @@ name: Build ImmortalWrt-24.10 for armsr_armv8
 
 on:
   workflow_dispatch:
-   inputs:
+    inputs:
       ssh:
         description: 'SSH connection to Actions'
         required: true
@@ -12,7 +12,7 @@ on:
           - true
           - false
   schedule:
-    - cron: "0 0 10,26 * *"
+    - cron: "0 0 10,26 * *" # 每月 10 号、26 号自动构建
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,6 +44,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update > /dev/null
+        # 安装自定义依赖列表
         sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
@@ -72,11 +73,11 @@ jobs:
         rm -rf openwrt/files openwrt/.config
         mv armsr/armv8/N1/files armsr/armv8/N1/.config openwrt/
 
-        # [新增] 动态生成开机静音脚本，调低 Cron 日志级别
+        # 动态生成开机静音脚本，调低 Cron 日志级别
         mkdir -p openwrt/files/etc/uci-defaults
         cat << 'EOF' > openwrt/files/etc/uci-defaults/99-mute-cron
         #!/bin/sh
-        # 将 Cron 日志级别设为 9 (Error)，屏蔽常规的 started 提示
+        # 将 Cron 日志级别设为 9 (Error)，屏蔽常规 started 提示
         uci set system.@system[0].cronloglevel='9'
         uci commit system
         /etc/init.d/cron restart
@@ -105,14 +106,35 @@ jobs:
     - name: Package N1 firmware
       uses: unifreq/openwrt_packit@master
       env:
+        # 这里传入 armsr/armv8 产出的 rootfs 包
+        # openwrt_packit 脚本兼容使用 OPENWRT_ARMVIRT 这个旧变量名
         OPENWRT_ARMVIRT: openwrt/bin/targets/armsr/armv8/*rootfs.tar.gz
-        KERNEL_REPO_URL: breakingbadboy/OpenWrt
+
+        # 改为 ophub/kernel 后，普通盒子会走 flippy 内核下载链路
+        # 不再是 breakingbadboy/OpenWrt 的 stable 分支
+        KERNEL_REPO_URL: ophub/kernel
+
+        # 指定 6.18.y 这个内核大系列：https://github.com/unifreq/openwrt_packit/blob/master/openwrt_flippy.sh
         KERNEL_VERSION_NAME: 6.18.y
+
+        # 自动获取 6.18.y 同系列中的最新补丁版
+        # 例如 6.18.x 中最新可用版本
         KERNEL_AUTO_LATEST: true
+
+        # 这里保持 diy，不要乱改
+        # 因为你下面是通过自定义脚本 mk_s905d_n1.sh 来打 N1 包
         PACKAGE_SOC: diy
+
+        # 输出镜像压缩格式保持 xz
         GZIP_IMGS: .xz
+
+        # 自定义 N1 打包脚本
         SCRIPT_DIY_PATH: armsr/armv8/N1/mk_s905d_n1.sh
+
+        # 固件作者标识
         WHOAMI: nantayo
+
+        # 保持你原有流量转发设置，不动
         SW_FLOWOFFLOAD: 0
         SFE_FLOW: 0
 
@@ -127,10 +149,10 @@ jobs:
             IP路径修改：armsr/armv8/N1/files/etc/config/network
               IP: 192.168.101.2
             账户: root
-            密码: password   
+            密码: password
 
     - name: Delete old releases
       uses: dev-drprasad/delete-older-releases@master
       with:
         keep_latest: 2
-        delete_tags : true
+        delete_tags: true
