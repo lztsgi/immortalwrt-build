@@ -6,9 +6,9 @@ on:
       rootfs_size:
         description: '设定 Rootfs 根分区大小 (单位: MB，2G = 2048)'
         required: true
-        default: '2048'
+        default: '2048' # 手动触发时的默认 Rootfs 大小
   schedule:
-    - cron: "0 0 1,16 * *"
+    - cron: "0 0 1,16 * *" # 每月 1 号和 16 号自动构建
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
@@ -18,6 +18,8 @@ env:
 jobs:
   build_r3s:
     runs-on: ubuntu-24.04
+
+    # 授权 GITHUB_TOKEN 拥有 Release 发布和 Actions 缓存清理权限
     permissions:
       actions: write
       contents: write
@@ -25,7 +27,7 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@main
-      
+
     - name: Free up space
       uses: jlumbroso/free-disk-space@main
       with:
@@ -42,6 +44,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update > /dev/null
+        # 安装编译 OpenWrt / ImmortalWrt 所需依赖
         sudo -E apt-get -qq install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools python3-pyelftools rsync swig unzip zlib1g-dev file wget xz-utils > /dev/null
         sudo -E apt-get -qq autoremove --purge > /dev/null
         sudo -E apt-get -qq clean > /dev/null
@@ -68,10 +71,18 @@ jobs:
 
     - name: Load Config & Inject Initialization Script
       run: |
+        # 载入外部仓库里的 R3S 配置文件
         cp armsr/armv8/R3S/.config openwrt/.config
-        # 手动触发用输入值；定时触发没有 input 时回退到 2048 , 用于自动构建任务兜底根分区容量
+
+        # Rootfs 分区大小：
+        # 1) 手动触发时，优先使用输入值
+        # 2) 定时任务触发时，没有 workflow_dispatch 输入，因此回退到 2048
         echo "CONFIG_TARGET_ROOTFS_PARTSIZE=${{ github.event.inputs.rootfs_size || '2048' }}" >> openwrt/.config
+
+        # 强制启用 ext4 rootfs
         echo "CONFIG_TARGET_ROOTFS_EXT4FS=y" >> openwrt/.config
+
+        # 注入首次启动初始化脚本
         mkdir -p openwrt/files/etc/uci-defaults
         cp armsr/armv8/R3S/initialization.sh openwrt/files/etc/uci-defaults/99-network-init
         chmod +x openwrt/files/etc/uci-defaults/99-network-init
@@ -84,6 +95,7 @@ jobs:
         find dl -size -1k -exec rm -f {} \;
 
     - name: Save Download Cache
+      # 即使后面编译失败，也尽量保留已下载依赖，减少下次构建时间
       if: always()
       uses: actions/cache/save@v4
       with:
@@ -93,12 +105,15 @@ jobs:
     - name: Compile R3S firmware
       working-directory: ./openwrt
       run: |
+        # 先并行编译，失败后再单线程输出详细日志，便于排错
         make -j$(nproc) || make -j1 V=s
 
     - name: Upload R3S firmware
       uses: softprops/action-gh-release@master
       with:
         tag_name: R3S_ImmortalWrt_${{ env.FILE_DATE }}
+        # 这里必须上传原生 sysupgrade.img.gz
+        # 不要 gunzip 再转 xz，否则会破坏 sysupgrade 需要的 metadata，导致 LuCI 升级校验失败
         files: openwrt/bin/targets/rockchip/armv8/*sysupgrade.img.gz
         body: |
           NanoPi R3S ImmortalWrt 固件
@@ -107,6 +122,7 @@ jobs:
           * 包含智能网卡探测与初始化配置。
 
     - name: Cleanup Cache on Success
+      # 仅在整个流程成功时清理 Actions 缓存
       if: success()
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
