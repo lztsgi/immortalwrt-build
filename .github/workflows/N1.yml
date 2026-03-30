@@ -112,7 +112,7 @@ jobs:
 
         # ophub/kernel 后，普通盒子会走 flippy 内核下载链路
         # breakingbadboy/OpenWrt 是 stable 分支
-        KERNEL_REPO_URL: breakingbadboy/kernel
+        KERNEL_REPO_URL: breakingbadboy/OpenWrt
 
         # 指定 6.18.y 这个内核大系列：https://github.com/unifreq/openwrt_packit/blob/master/openwrt_flippy.sh
         KERNEL_VERSION_NAME: 6.12.y
