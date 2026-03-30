@@ -132,7 +132,7 @@ jobs:
         SCRIPT_DIY_PATH: armsr/armv8/N1/mk_s905d_n1.sh
 
         # 固件作者标识
-        WHOAMI: nantayo
+        WHOAMI: LZT
 
         # 保持原有流量转发设置，不动
         SW_FLOWOFFLOAD: 0
