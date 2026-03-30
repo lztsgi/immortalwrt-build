@@ -120,6 +120,7 @@ jobs:
           * 架构：Rockchip RK356X
           * 根分区大小：${{ github.event.inputs.rootfs_size || '2048' }} MB
           * 包含智能网卡探测与初始化配置。
+          * 默认IP 192.168.100.1或者192.168.100.2
 
     - name: Cleanup Cache on Success
       # 仅在整个流程成功时清理 Actions 缓存
