@@ -122,7 +122,7 @@ jobs:
         KERNEL_AUTO_LATEST: true
 
         # 这里保持 diy，不要乱改
-        # 因为你下面是通过自定义脚本 mk_s905d_n1.sh 来打 N1 包
+        # 因为下面是通过自定义脚本 mk_s905d_n1.sh 来打 N1 包
         PACKAGE_SOC: diy
 
         # 输出镜像压缩格式保持 xz
@@ -134,7 +134,7 @@ jobs:
         # 固件作者标识
         WHOAMI: nantayo
 
-        # 保持你原有流量转发设置，不动
+        # 保持原有流量转发设置，不动
         SW_FLOWOFFLOAD: 0
         SFE_FLOW: 0
 
