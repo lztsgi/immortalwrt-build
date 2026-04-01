@@ -141,7 +141,7 @@ jobs:
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
       with:
-        tag_name: OpenWrt_${{ env.FILE_DATE }}
+        tag_name: N1_OpenWrt_${{ env.FILE_DATE }}
         files: ${{ env.PACKAGED_OUTPUTPATH }}/*.img.*
         body: |
           首次使用建议全新刷写
