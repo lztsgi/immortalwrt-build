@@ -156,8 +156,3 @@ jobs:
       with:
         keep_latest: 2
         delete_tags: true
-
-    # ================= 修改区：失败救援机制 =================
-    - name: SSH connect to Actions on failure
-      uses: P3TERX/ssh2actions@main
-      if: failure()
