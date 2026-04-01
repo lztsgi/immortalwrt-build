@@ -16,7 +16,10 @@ config amlogic 'config'
 	#  breakingbadboy 的 kernel releases 分支 https://github.com/breakingbadboy/OpenWrt
 	# [更新] 指定在线拉取独立内核的 GitHub 仓库地址
 	option amlogic_kernel_path 'https://github.com/ophub/kernel'
-	
+
+	# [更新] 兜底规则：指定拉取内核的版本标签 (如 'stable', 'mainline', 留空则默认抓取 'stable' 稳定版)
+	option amlogic_kernel_tags ''
+
 	# 推荐留空，默认跟随当前固件分支；不要再写死 6.12.y
 	# [更新] 指定需要拉取的内核分支（留空则脚本自动识别当前匹配版本）
 	option amlogic_kernel_branch ''
