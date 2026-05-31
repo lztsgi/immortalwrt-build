@@ -100,7 +100,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: openwrt/dl
-        key: openwrt-dl-${{ github.run_id }}
+        key: openwrt-dl-${{ env.REPO_BRANCH }}-${{ github.run_id }}
 
     - name: Compile R3S firmware
       working-directory: ./openwrt
