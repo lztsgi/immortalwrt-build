@@ -1,4 +1,4 @@
-name: Build ImmortalWrt for armsr_armv8
+name: Build ImmortalWrt for N1_BOX
 
 on:
   workflow_dispatch:
